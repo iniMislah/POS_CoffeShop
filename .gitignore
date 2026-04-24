@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+
+# build
+dist
+.next
+web/.next
+
+# env files (PENTING - jangan ke-upload)
+.env
+.env.local
+web/.env.local
+
+# logs
+*.log
+
+# coverage
+coverage
+
+# system files
+.DS_Store
