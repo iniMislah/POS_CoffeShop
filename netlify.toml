@@ -1,6 +1,0 @@
-[build]
-  command = "npm --prefix web install && npm --prefix web run build"
-  publish = "web/.next"
-
-[build.environment]
-  NODE_VERSION = "22"
