@@ -53,6 +53,67 @@ npm run dev
 
 - Admin: `fatma@galehkopi.local` / `admin123#`
 
+## Deployment Trial
+
+### Render Postgres
+
+Gunakan konfigurasi berikut saat membuat database di Render:
+
+- Name: `galehkopi-pos-db`
+- Database: `galehkopi_pos`
+- User: kosongkan agar Render generate otomatis
+- Region: `Oregon (US West)`
+- PostgreSQL Version: `18`
+- Instance type: `Free`
+- Storage: `1 GB`
+- Storage Autoscaling: `Disabled`
+- High Availability: `Disabled`
+
+Catatan: field `Database` harus persis `galehkopi_pos` tanpa spasi di depan/belakang.
+
+### Render Backend
+
+Setelah database dibuat, deploy backend sebagai Web Service:
+
+- Root Directory: kosong / root repository
+- Build Command: `npm install && npx prisma generate && npm run build`
+- Pre-Deploy Command: `npx prisma migrate deploy`
+- Start Command: `npm start`
+
+Environment variables backend:
+
+```env
+NODE_ENV=production
+DATABASE_URL=<Internal Database URL dari galehkopi-pos-db>
+APP_URL=https://<render-backend-url>
+WEB_APP_URL=https://<netlify-frontend-url>
+RECEIPT_PUBLIC_BASE_URL=https://<netlify-frontend-url>/receipt
+JWT_SECRET=<secret-minimal-16-karakter>
+JWT_EXPIRES_IN=7d
+PAYMENT_GATEWAY_NAME=manual
+PAYMENT_WEBHOOK_SECRET=
+MIDTRANS_SERVER_KEY=
+MIDTRANS_CLIENT_KEY=
+MIDTRANS_IS_PRODUCTION=false
+```
+
+Gunakan `Internal Database URL` dari Render untuk `DATABASE_URL` karena backend dan database berada di region Render yang sama.
+
+### Netlify Frontend
+
+Deploy folder `web` ke Netlify:
+
+- Base directory: `web`
+- Build command: `npm run build`
+- Publish directory: `.next`
+
+Environment variables frontend:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://<render-backend-url>/api
+NEXT_PUBLIC_APP_URL=https://<netlify-frontend-url>
+```
+
 ## Dokumentasi
 
 - Swagger UI: `GET /docs`
