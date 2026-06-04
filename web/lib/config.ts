@@ -1,30 +1,29 @@
-const isProduction = process.env.NODE_ENV === "production";
+const PRODUCTION_API_BASE_URL =
+  "https://poscoffeshop-production.up.railway.app/api";
 
-function getPublicEnv(
-  name: "NEXT_PUBLIC_API_BASE_URL" | "NEXT_PUBLIC_APP_URL",
-  developmentFallback: string
-) {
-  const value = process.env[name]?.replace(/\/$/, "");
+const DEVELOPMENT_API_BASE_URL =
+  "http://localhost:4000/api";
 
-  if (value) {
-    return value;
-  }
+const PRODUCTION_APP_BASE_URL =
+  "https://pos-coffe-shop-nine.vercel.app";
 
-  if (isProduction) {
-    throw new Error(`${name} must be configured in production`);
-  }
+const DEVELOPMENT_APP_BASE_URL =
+  "http://localhost:3000";
 
-  return developmentFallback;
+function cleanUrl(value: string) {
+  return value.trim().replace(/\/$/, "");
 }
 
-export const API_BASE_URL = getPublicEnv(
-  "NEXT_PUBLIC_API_BASE_URL",
-  "http://localhost:4000/api"
+const isProduction = process.env.NODE_ENV === "production";
+
+export const API_BASE_URL = cleanUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+    (isProduction ? PRODUCTION_API_BASE_URL : DEVELOPMENT_API_BASE_URL)
 );
 
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, "");
 
-export const APP_BASE_URL = getPublicEnv(
-  "NEXT_PUBLIC_APP_URL",
-  "http://localhost:3000"
+export const APP_BASE_URL = cleanUrl(
+  process.env.NEXT_PUBLIC_APP_URL ||
+    (isProduction ? PRODUCTION_APP_BASE_URL : DEVELOPMENT_APP_BASE_URL)
 );
