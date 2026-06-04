@@ -9,6 +9,10 @@ export const cashPaymentSchema = z.object({
   amountReceived: z.coerce.number().positive(),
 });
 
+export const qrisManualPaymentSchema = z.object({
+  gatewayReference: z.string().trim().max(100).optional(),
+});
+
 export const qrisWebhookSchema = z.object({
   gatewayReference: z.string().min(1),
   status: z.nativeEnum(PaymentStatus),

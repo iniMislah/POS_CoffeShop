@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Coffee } from "lucide-react";
 
@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { getDefaultRouteForRole } from "@/lib/access-control";
 
-export default function LoginPage() {
-  const { login, isAuthenticated, isLoggingIn, authError } = useAuth();
+function LoginForm() {
+  const { login, user, isAuthenticated, isLoggingIn, authError } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = searchParams.get("next");
 
   const [email, setEmail] = useState("admin@kopikita.local");
   const [password, setPassword] = useState("Admin123!");
@@ -22,9 +23,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace(next);
+      router.replace(next || getDefaultRouteForRole(user?.role));
     }
-  }, [isAuthenticated, next, router]);
+  }, [isAuthenticated, next, router, user?.role]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -32,7 +33,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.replace(next);
+      router.replace(next || getDefaultRouteForRole(user?.role));
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Login failed");
     }
@@ -49,11 +50,11 @@ export default function LoginPage() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.22em] text-white/60">POS Suite</p>
-                <h1 className="text-2xl font-semibold">Kopi Kita</h1>
+                <h1 className="text-2xl font-semibold">Galeh Kopi</h1>
               </div>
             </div>
             <div>
-              <h2 className="max-w-sm text-4xl font-semibold leading-tight">Warm operations for a fast-moving coffee bar.</h2>
+              <h2 className="max-w-sm text-4xl font-semibold leading-tight">KASIR UNTUAK ADMIN GALEH KOPI</h2>
               <p className="mt-4 max-w-md text-sm text-white/75">
                 Login to access cashier workflow, live transactions, QRIS checkout, and receipt delivery in one modern control room.
               </p>
@@ -78,12 +79,8 @@ export default function LoginPage() {
                   {(formError || authError) ? (
                     <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError || authError}</div>
                   ) : null}
-                  <div className="rounded-2xl bg-cream-50 p-4 text-sm text-coffee-700/75">
-                    <p>Admin demo: `admin@kopikita.local` / `Admin123!`</p>
-                    <p className="mt-1">Cashier demo: `cashier@kopikita.local` / `Cashier123!`</p>
-                  </div>
                   <Button className="w-full" size="lg" disabled={isLoggingIn}>
-                    {isLoggingIn ? "Signing in..." : "Login to Dashboard"}
+                    {isLoggingIn ? "Signing in..." : "Login"}
                   </Button>
                 </form>
               </CardContent>
@@ -92,5 +89,13 @@ export default function LoginPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-[#fffdf9] via-[#f9f2e7] to-[#edd8c0]" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

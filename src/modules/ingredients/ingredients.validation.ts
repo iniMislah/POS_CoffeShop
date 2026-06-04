@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ingredientSchema = z.object({
+const ingredientFieldsSchema = z.object({
   name: z.string().min(2),
   unit: z.string().min(1),
   currentStock: z.coerce.number().nonnegative(),
@@ -8,7 +8,11 @@ export const ingredientSchema = z.object({
   costPerUnit: z.coerce.number().nonnegative(),
 });
 
-export const updateIngredientSchema = ingredientSchema.partial();
+export const ingredientSchema = ingredientFieldsSchema.extend({
+  note: z.string().trim().optional(),
+});
+
+export const updateIngredientSchema = ingredientFieldsSchema.partial();
 
 export const ingredientIdParamSchema = z.object({
   id: z.string().uuid(),

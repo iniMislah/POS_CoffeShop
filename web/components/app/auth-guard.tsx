@@ -6,9 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { canAccessPath, getDefaultRouteForRole } from "@/lib/access-control";
 
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { isAuthenticated, isInitializing, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -17,6 +18,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [isAuthenticated, isInitializing, pathname, router]);
+
+  useEffect(() => {
+    if (!isInitializing && isAuthenticated && user && !canAccessPath(user.role, pathname)) {
+      router.replace(`/unauthorized?from=${encodeURIComponent(pathname)}`);
+    }
+  }, [isAuthenticated, isInitializing, pathname, router, user]);
 
   if (isInitializing) {
     return (
@@ -34,6 +41,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (user && !canAccessPath(user.role, pathname)) {
     return null;
   }
 

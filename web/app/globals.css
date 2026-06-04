@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --background: 34 100% 99%;
-  --foreground: 21 37% 15%;
-  --card: 0 0% 100%;
-  --card-foreground: 21 37% 15%;
-  --border: 34 48% 90%;
-  --input: 34 48% 90%;
-  --ring: 24 41% 42%;
-  --primary: 24 41% 42%;
-  --primary-foreground: 34 100% 99%;
-  --secondary: 34 60% 95%;
-  --secondary-foreground: 24 35% 23%;
-  --muted: 34 45% 96%;
-  --muted-foreground: 24 13% 44%;
-  --accent: 34 75% 90%;
-  --accent-foreground: 24 35% 23%;
+  --background: 0 0% 100%;
+  --foreground: 23 28% 27%;
+  --card: 40 50% 99%;
+  --card-foreground: 23 28% 27%;
+  --border: 33 38% 83%;
+  --input: 33 38% 83%;
+  --ring: 23 28% 27%;
+  --primary: 23 28% 27%;
+  --primary-foreground: 40 60% 98%;
+  --secondary: 36 46% 95%;
+  --secondary-foreground: 23 28% 27%;
+  --muted: 38 38% 97%;
+  --muted-foreground: 23 18% 40%;
+  --accent: 33 41% 84%;
+  --accent-foreground: 23 28% 27%;
 }
 
 * {
@@ -31,12 +31,26 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(236, 216, 194, 0.8), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(143, 90, 60, 0.09), transparent 33%),
-    linear-gradient(180deg, #fffdf9 0%, #f9f2e7 100%);
+    radial-gradient(circle at top left, rgba(232, 216, 195, 0.24), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(232, 216, 195, 0.14), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #fdfbf7 100%);
   color: hsl(var(--foreground));
 }
 
 .page-shell {
-  background-image: radial-gradient(circle at 0% 0%, rgba(255,255,255,0.85), transparent 40%), radial-gradient(circle at 100% 100%, rgba(215, 176, 145, 0.14), transparent 30%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(253, 251, 247, 0.82));
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(90, 64, 50, 0.22);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(253, 251, 247, 0.75);
 }

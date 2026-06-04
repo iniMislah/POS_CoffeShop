@@ -10,6 +10,8 @@ import { dateRangeQuerySchema } from "./reports.validation";
 export const reportRoutes = Router();
 
 reportRoutes.use(authorize(UserRole.ADMIN));
+reportRoutes.get("/orders/export", validateRequest(dateRangeQuerySchema, "query"), asyncHandler(reportsController.exportOrders));
+reportRoutes.get("/sales/export", validateRequest(dateRangeQuerySchema, "query"), asyncHandler(reportsController.exportSales));
 reportRoutes.get("/sales-summary", validateRequest(dateRangeQuerySchema, "query"), asyncHandler(reportsController.salesSummary));
 reportRoutes.get("/transactions", validateRequest(dateRangeQuerySchema, "query"), asyncHandler(reportsController.transactionList));
 reportRoutes.get("/products", validateRequest(dateRangeQuerySchema, "query"), asyncHandler(reportsController.productSalesSummary));

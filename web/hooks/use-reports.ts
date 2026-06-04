@@ -14,9 +14,9 @@ type DateRange = {
 export type SalesSummary = {
   totalOrders: number;
   subtotal: number;
-  taxAmount: number;
   serviceAmount: number;
   grossSales: number;
+  totalSales: number;
 };
 
 export type ProductSales = {

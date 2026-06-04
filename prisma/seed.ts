@@ -2,6 +2,7 @@ import {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  Prisma,
   PrismaClient,
   StockMovementType,
   UserRole,
@@ -20,12 +21,14 @@ async function main() {
       name: "Admin Coffee Shop",
       passwordHash: adminPasswordHash,
       role: UserRole.ADMIN,
+      isActive: true,
     },
     create: {
       name: "Admin Coffee Shop",
       email: "admin@kopikita.local",
       passwordHash: adminPasswordHash,
       role: UserRole.ADMIN,
+      isActive: true,
     },
   });
 
@@ -35,16 +38,18 @@ async function main() {
       name: "Cashier Coffee Shop",
       passwordHash: cashierPasswordHash,
       role: UserRole.CASHIER,
+      isActive: true,
     },
     create: {
       name: "Cashier Coffee Shop",
       email: "cashier@kopikita.local",
       passwordHash: cashierPasswordHash,
       role: UserRole.CASHIER,
+      isActive: true,
     },
   });
 
-  const [coffeeCategory, nonCoffeeCategory, foodCategory] = await Promise.all([
+  const [coffeeCategory, nonCoffeeCategory, teaCategory, snackCategory, dessertCategory] = await Promise.all([
     prisma.category.upsert({
       where: { name: "Coffee" },
       update: {},
@@ -56,9 +61,19 @@ async function main() {
       create: { name: "Non Coffee" },
     }),
     prisma.category.upsert({
-      where: { name: "Food" },
+      where: { name: "Tea" },
       update: {},
-      create: { name: "Food" },
+      create: { name: "Tea" },
+    }),
+    prisma.category.upsert({
+      where: { name: "Snack" },
+      update: {},
+      create: { name: "Snack" },
+    }),
+    prisma.category.upsert({
+      where: { name: "Dessert" },
+      update: {},
+      create: { name: "Dessert" },
     }),
   ]);
 
@@ -180,7 +195,7 @@ async function main() {
   await prisma.product.upsert({
     where: {
       categoryId_name: {
-        categoryId: foodCategory.id,
+        categoryId: snackCategory.id,
         name: "Croissant Butter",
       },
     },
@@ -189,9 +204,62 @@ async function main() {
       isAvailable: true,
     },
     create: {
-      categoryId: foodCategory.id,
+      categoryId: snackCategory.id,
       name: "Croissant Butter",
       basePrice: "18000",
+      isAvailable: true,
+    },
+  });
+
+  const walkInPreferredCustomer = await prisma.customer.upsert({
+    where: { phone: "081234567890" },
+    update: {
+      name: "Nadia Putri",
+      email: "nadia@example.com",
+      notes: "Prefers iced coffee",
+    },
+    create: {
+      name: "Nadia Putri",
+      phone: "081234567890",
+      email: "nadia@example.com",
+      notes: "Prefers iced coffee",
+    },
+  });
+
+  await prisma.product.upsert({
+    where: {
+      categoryId_name: {
+        categoryId: teaCategory.id,
+        name: "Peach Tea",
+      },
+    },
+    update: {
+      basePrice: "21000",
+      isAvailable: true,
+    },
+    create: {
+      categoryId: teaCategory.id,
+      name: "Peach Tea",
+      basePrice: "21000",
+      isAvailable: true,
+    },
+  });
+
+  await prisma.product.upsert({
+    where: {
+      categoryId_name: {
+        categoryId: dessertCategory.id,
+        name: "Tiramisu Cup",
+      },
+    },
+    update: {
+      basePrice: "28000",
+      isAvailable: true,
+    },
+    create: {
+      categoryId: dessertCategory.id,
+      name: "Tiramisu Cup",
+      basePrice: "28000",
       isAvailable: true,
     },
   });
@@ -300,23 +368,17 @@ async function main() {
     }),
   ]);
 
-  const latteRecipe = await prisma.recipe.upsert({
-    where: { productId: latte.id },
-    update: {},
-    create: { productId: latte.id },
-  });
+  const latteRecipe =
+    (await prisma.recipe.findFirst({ where: { productId: latte.id, variantId: null } })) ??
+    (await prisma.recipe.create({ data: { productId: latte.id } }));
 
-  const arenRecipe = await prisma.recipe.upsert({
-    where: { productId: arenLatte.id },
-    update: {},
-    create: { productId: arenLatte.id },
-  });
+  const arenRecipe =
+    (await prisma.recipe.findFirst({ where: { productId: arenLatte.id, variantId: null } })) ??
+    (await prisma.recipe.create({ data: { productId: arenLatte.id } }));
 
-  const matchaRecipe = await prisma.recipe.upsert({
-    where: { productId: matchaLatte.id },
-    update: {},
-    create: { productId: matchaLatte.id },
-  });
+  const matchaRecipe =
+    (await prisma.recipe.findFirst({ where: { productId: matchaLatte.id, variantId: null } })) ??
+    (await prisma.recipe.create({ data: { productId: matchaLatte.id } }));
 
   await Promise.all([
     prisma.recipeItem.upsert({
@@ -423,24 +485,28 @@ async function main() {
     where: { invoiceNumber: "INV-20260423-0001" },
     update: {
       cashierId: cashier.id,
+      customerId: walkInPreferredCustomer.id,
+      customerNameSnapshot: walkInPreferredCustomer.name,
       status: OrderStatus.PAID,
       paymentStatus: PaymentStatus.PAID,
       subtotal: "24000",
-      taxAmount: "2400",
+      taxAmount: "0",
       serviceAmount: "1000",
-      totalAmount: "27400",
+      totalAmount: "25000",
       receiptToken: "sample-receipt-token",
       paidAt: new Date(),
     },
     create: {
       invoiceNumber: "INV-20260423-0001",
       cashierId: cashier.id,
+      customerId: walkInPreferredCustomer.id,
+      customerNameSnapshot: walkInPreferredCustomer.name,
       status: OrderStatus.PAID,
       paymentStatus: PaymentStatus.PAID,
       subtotal: "24000",
-      taxAmount: "2400",
+      taxAmount: "0",
       serviceAmount: "1000",
-      totalAmount: "27400",
+      totalAmount: "25000",
       receiptToken: "sample-receipt-token",
       paidAt: new Date(),
     },
@@ -511,28 +577,28 @@ async function main() {
       orderId: sampleOrder.id,
       method: PaymentMethod.QRIS,
       status: PaymentStatus.PAID,
-      amount: "27400",
-      amountReceived: "27400",
+      amount: "25000",
+      amountReceived: "25000",
       changeAmount: "0",
-      gatewayProvider: "midtrans",
-      gatewayReference: "MID-INV-20260423-0001",
-      qrString: "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214202404230000010303UMI51440014ID.CO.QRIS.WWW0215ID1025408085204549953033605802ID5910KOPI KITA6007JAKARTA61051234562070703A016304B2C1",
+      gatewayProvider: "manual-external-qris",
+      gatewayReference: "QRIS-MANUAL-SEED-0001",
+      qrString: null,
       paidAt: new Date(),
-      rawResponse: { seed: true, message: "Sample QRIS paid transaction" },
+      rawResponse: Prisma.JsonNull,
     },
     create: {
       id: "11111111-1111-1111-1111-111111111111",
       orderId: sampleOrder.id,
       method: PaymentMethod.QRIS,
       status: PaymentStatus.PAID,
-      amount: "27400",
-      amountReceived: "27400",
+      amount: "25000",
+      amountReceived: "25000",
       changeAmount: "0",
-      gatewayProvider: "midtrans",
-      gatewayReference: "MID-INV-20260423-0001",
-      qrString: "00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214202404230000010303UMI51440014ID.CO.QRIS.WWW0215ID1025408085204549953033605802ID5910KOPI KITA6007JAKARTA61051234562070703A016304B2C1",
+      gatewayProvider: "manual-external-qris",
+      gatewayReference: "QRIS-MANUAL-SEED-0001",
+      qrString: null,
       paidAt: new Date(),
-      rawResponse: { seed: true, message: "Sample QRIS paid transaction" },
+      rawResponse: Prisma.JsonNull,
     },
   });
 
@@ -586,7 +652,7 @@ async function main() {
   console.log({
     adminId: admin.id,
     cashierId: cashier.id,
-    categoryIds: [coffeeCategory.id, nonCoffeeCategory.id, foodCategory.id],
+    categoryIds: [coffeeCategory.id, nonCoffeeCategory.id, teaCategory.id, snackCategory.id, dessertCategory.id],
     sampleOrderId: sampleOrder.id,
   });
 }

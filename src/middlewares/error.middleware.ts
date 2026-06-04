@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
 import { AppError } from "../common/app-error";
@@ -20,12 +21,34 @@ export const errorMiddleware = (error: unknown, _req: Request, res: Response, _n
     });
   }
 
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      return res.status(409).json({
+        success: false,
+        message: "A record with the same unique value already exists.",
+        errors: error.meta ?? null,
+      });
+    }
+
+    if (error.code === "P2025") {
+      return res.status(404).json({
+        success: false,
+        message: "Requested record was not found.",
+        errors: error.meta ?? null,
+      });
+    }
+  }
+
   if (error instanceof Error) {
+    console.error(error);
+
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: process.env.NODE_ENV === "production" ? "Internal server error" : error.message,
     });
   }
+
+  console.error(error);
 
   return res.status(500).json({
     success: false,

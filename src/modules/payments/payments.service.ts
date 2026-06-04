@@ -1,83 +1,157 @@
-import { OrderStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { OrderStatus, PaymentMethod, PaymentStatus, Prisma, UserRole } from "@prisma/client";
 
 import { AppError } from "../../common/app-error";
-import { generateReceiptToken } from "../../common/utils";
-import { env } from "../../config/env";
+import { generateReceiptToken, getReceiptPublicUrl } from "../../common/utils";
 import { prisma } from "../../lib/prisma";
 import { inventoryService } from "../inventory/inventory.service";
-import { MockQrisProvider } from "./mock-qris.provider";
 
-const qrisProvider = new MockQrisProvider();
-const MOCK_QRIS_AUTO_PAY_MS = 15000;
-
-const finalizePaidOrder = async (orderId: string, paidAt: Date) => {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new AppError("Order not found", 404);
-    }
-
-    const updatedOrder = await tx.order.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.PAID,
-        paymentStatus: PaymentStatus.PAID,
-        paidAt,
-        receiptToken: order.receiptToken ?? generateReceiptToken(),
-      },
-    });
-
-    await inventoryService.deductIngredientsForPaidOrderTx(tx, orderId);
-
-    return updatedOrder;
-  });
+type RequestUser = {
+  id: string;
+  role: UserRole;
 };
 
+type PaginationInput = {
+  page: number;
+  limit: number;
+};
+
+const ensureOrderReadyForPayment = (status: OrderStatus) => {
+  if (status === OrderStatus.CANCELLED) {
+    throw new AppError("Cancelled order cannot be paid", 400);
+  }
+
+  if (status === OrderStatus.PAID) {
+    throw new AppError("Order already paid", 400);
+  }
+
+  if (status === OrderStatus.DRAFT) {
+    throw new AppError("Checkout order before payment", 400);
+  }
+};
+
+const ensureOrderInScope = (order: { cashierId: string }, user: RequestUser) => {
+  if (user.role !== UserRole.ADMIN && order.cashierId !== user.id) {
+    throw new AppError("Forbidden", 403);
+  }
+};
+
+const orderScopeWhere = (user: RequestUser) =>
+  user.role === UserRole.ADMIN
+    ? {}
+    : {
+        cashierId: user.id,
+      };
+
+const finalizePaidOrderTx = async (tx: Prisma.TransactionClient, orderId: string, paidAt: Date) => {
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  if (order.status === OrderStatus.PAID && order.stockDeductedAt) {
+    return order;
+  }
+
+  const updatedOrder = await tx.order.update({
+    where: { id: orderId },
+    data: {
+      status: OrderStatus.PAID,
+      paymentStatus: PaymentStatus.PAID,
+      paidAt,
+      receiptToken: order.receiptToken ?? generateReceiptToken(),
+    },
+  });
+
+  await inventoryService.deductIngredientsForPaidOrderTx(tx, orderId);
+
+  return updatedOrder;
+};
+
+const getOrderWithLatestPayment = (orderId: string) =>
+  prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      cashier: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+        },
+      },
+      orderItems: {
+        include: {
+          modifiers: true,
+        },
+      },
+      paymentTransactions: {
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+  });
+
 export const paymentsService = {
-  async listTransactions() {
+  async listTransactions(user: RequestUser, pagination: PaginationInput) {
     return prisma.paymentTransaction.findMany({
       orderBy: { createdAt: "desc" },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
+      where: user.role === UserRole.ADMIN ? undefined : { order: orderScopeWhere(user) },
       include: {
         order: {
           select: {
             id: true,
             invoiceNumber: true,
             totalAmount: true,
+            subtotal: true,
+            serviceAmount: true,
             status: true,
             paymentStatus: true,
             receiptToken: true,
+            customerNameSnapshot: true,
           },
         },
       },
     });
   },
 
-  async payCash(orderId: string, payload: { amountReceived: number }) {
+  async payCash(orderId: string, payload: { amountReceived: number }, user: RequestUser) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
+      include: {
+        paymentTransactions: {
+          where: {
+            status: PaymentStatus.PAID,
+          },
+        },
+      },
     });
 
     if (!order) {
       throw new AppError("Order not found", 404);
     }
 
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new AppError("Cancelled order cannot be paid", 400);
-    }
+    ensureOrderInScope(order, user);
 
-    if (order.status === OrderStatus.PAID) {
-      throw new AppError("Order already paid", 400);
-    }
+    ensureOrderReadyForPayment(order.status);
 
-    if (order.status === OrderStatus.DRAFT) {
-      throw new AppError("Checkout order before payment", 400);
+    if (order.paymentTransactions.length > 0) {
+      throw new AppError("This order already has a paid transaction.", 409);
     }
 
     const totalAmount = Number(order.totalAmount);
-
     if (payload.amountReceived < totalAmount) {
       throw new AppError("Amount received is insufficient", 400);
     }
@@ -85,136 +159,41 @@ export const paymentsService = {
     const changeAmount = payload.amountReceived - totalAmount;
     const paidAt = new Date();
 
-    const transaction = await prisma.paymentTransaction.create({
-      data: {
-        orderId,
-        method: PaymentMethod.CASH,
-        status: PaymentStatus.PAID,
-        amount: totalAmount,
-        amountReceived: payload.amountReceived,
-        changeAmount,
-        paidAt,
-        rawResponse: {
-          type: "cash",
+    const { transaction, updatedOrder } = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.paymentTransaction.create({
+        data: {
+          orderId,
+          method: PaymentMethod.CASH,
+          status: PaymentStatus.PAID,
+          amount: totalAmount,
+          grossAmount: totalAmount,
+          amountReceived: payload.amountReceived,
+          changeAmount,
+          paidAt,
+          gatewayProvider: "cash",
+          transactionId: `cash-${order.invoiceNumber}`,
         },
-      },
-    });
+      });
 
-    const updatedOrder = await finalizePaidOrder(orderId, paidAt);
+      const updatedOrder = await finalizePaidOrderTx(tx, orderId, paidAt);
 
-    return {
-      transaction,
-      order: updatedOrder,
-      receiptUrl: `${env.APP_URL}/api/receipts/public/${updatedOrder.receiptToken}`,
-    };
-  },
-
-  async createQrisPayment(orderId: string) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new AppError("Order not found", 404);
-    }
-
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new AppError("Cancelled order cannot be paid", 400);
-    }
-
-    if (order.status === OrderStatus.PAID) {
-      throw new AppError("Order already paid", 400);
-    }
-
-    if (order.status === OrderStatus.DRAFT) {
-      throw new AppError("Checkout order before payment", 400);
-    }
-
-    const qrisPayment = await qrisProvider.createQrPayment({
-      orderId,
-      amount: Number(order.totalAmount),
-      invoiceNumber: order.invoiceNumber,
-    });
-
-    const transaction = await prisma.paymentTransaction.create({
-      data: {
-        orderId,
-        method: PaymentMethod.QRIS,
-        status: PaymentStatus.PENDING,
-        amount: order.totalAmount,
-        gatewayProvider: qrisPayment.provider,
-        gatewayReference: qrisPayment.gatewayReference,
-        qrString: qrisPayment.qrString,
-        expiredAt: qrisPayment.expiredAt,
-        rawResponse: {
-          mock: true,
-        },
-      },
+      return { transaction, updatedOrder };
     });
 
     return {
       transaction,
-      qrString: qrisPayment.qrString,
-      gatewayReference: qrisPayment.gatewayReference,
-      expiredAt: qrisPayment.expiredAt,
+      order: await getOrderWithLatestPayment(updatedOrder.id),
+      receiptUrl: updatedOrder.receiptToken ? getReceiptPublicUrl(updatedOrder.receiptToken) : null,
     };
   },
 
-  async handleQrisWebhook(payload: { gatewayReference: string; status: PaymentStatus; paidAt?: Date; secret?: string }) {
-    if (payload.secret && payload.secret !== env.PAYMENT_WEBHOOK_SECRET) {
-      throw new AppError("Invalid webhook secret", 401);
-    }
-
-    const transaction = await prisma.paymentTransaction.findFirst({
-      where: {
-        gatewayReference: payload.gatewayReference,
-      },
-      include: {
-        order: true,
-      },
-    });
-
-    if (!transaction) {
-      throw new AppError("Payment transaction not found", 404);
-    }
-
-    const updatedTransaction = await prisma.paymentTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status: payload.status,
-        paidAt: payload.status === PaymentStatus.PAID ? payload.paidAt ?? new Date() : null,
-      },
-    });
-
-    if (payload.status === PaymentStatus.PAID) {
-      const updatedOrder = await finalizePaidOrder(transaction.orderId, payload.paidAt ?? new Date());
-
-      return {
-        transaction: updatedTransaction,
-        order: updatedOrder,
-        receiptUrl: `${env.APP_URL}/api/receipts/public/${updatedOrder.receiptToken}`,
-      };
-    }
-
-    await prisma.order.update({
-      where: { id: transaction.orderId },
-      data: {
-        paymentStatus: payload.status,
-      },
-    });
-
-    return {
-      transaction: updatedTransaction,
-    };
-  },
-
-  async getOrderPaymentStatus(orderId: string) {
+  async payManualQris(orderId: string, payload: { gatewayReference?: string }, user: RequestUser) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         paymentTransactions: {
-          orderBy: {
-            createdAt: "desc",
+          where: {
+            status: PaymentStatus.PAID,
           },
         },
       },
@@ -224,88 +203,59 @@ export const paymentsService = {
       throw new AppError("Order not found", 404);
     }
 
-    const latestTransaction = order.paymentTransactions[0] ?? null;
+    ensureOrderInScope(order, user);
 
-    if (!latestTransaction) {
-      return {
-        order,
-        payment: null,
-      };
+    ensureOrderReadyForPayment(order.status);
+
+    if (order.paymentTransactions.length > 0) {
+      throw new AppError("This order already has a paid transaction.", 409);
     }
 
-    if (
-      latestTransaction.method === PaymentMethod.QRIS &&
-      latestTransaction.status === PaymentStatus.PENDING
-    ) {
-      const now = new Date();
-      const expiredAt = latestTransaction.expiredAt;
-      const createdAt = latestTransaction.createdAt;
-      const isExpired = expiredAt ? expiredAt <= now : false;
-      const shouldAutoPay =
-        !isExpired &&
-        now.getTime() - createdAt.getTime() >= MOCK_QRIS_AUTO_PAY_MS;
+    const paidAt = new Date();
+    const { transaction, updatedOrder } = await prisma.$transaction(async (tx) => {
+      // Manual external QRIS: PAID means the cashier has confirmed the payment, not gateway auto-verification.
+      const transaction = await tx.paymentTransaction.create({
+        data: {
+          orderId,
+          method: PaymentMethod.QRIS,
+          status: PaymentStatus.PAID,
+          amount: order.totalAmount,
+          grossAmount: order.totalAmount,
+          paidAt,
+          gatewayProvider: "manual-external-qris",
+          gatewayReference: payload.gatewayReference?.trim() || null,
+          transactionId: payload.gatewayReference?.trim() || `manual-qris-${order.invoiceNumber}`,
+        },
+      });
 
-      if (isExpired) {
-        const expiredTransaction = await prisma.paymentTransaction.update({
-          where: { id: latestTransaction.id },
-          data: {
-            status: PaymentStatus.EXPIRED,
-          },
-        });
+      const updatedOrder = await finalizePaidOrderTx(tx, orderId, paidAt);
 
-        const expiredOrder = await prisma.order.update({
-          where: { id: orderId },
-          data: {
-            paymentStatus: PaymentStatus.EXPIRED,
-          },
-          include: {
-            paymentTransactions: {
-              orderBy: {
-                createdAt: "desc",
-              },
-            },
-          },
-        });
+      return { transaction, updatedOrder };
+    });
 
-        return {
-          order: expiredOrder,
-          payment: expiredTransaction,
-        };
-      }
+    return {
+      transaction,
+      order: await getOrderWithLatestPayment(updatedOrder.id),
+      receiptUrl: updatedOrder.receiptToken ? getReceiptPublicUrl(updatedOrder.receiptToken) : null,
+    };
+  },
 
-      if (shouldAutoPay) {
-        await prisma.paymentTransaction.update({
-          where: { id: latestTransaction.id },
-          data: {
-            status: PaymentStatus.PAID,
-            paidAt: now,
-          },
-        });
-
-        const paidOrder = await finalizePaidOrder(orderId, now);
-        const refreshedOrder = await prisma.order.findUniqueOrThrow({
-          where: { id: orderId },
-          include: {
-            paymentTransactions: {
-              orderBy: {
-                createdAt: "desc",
-              },
-            },
-          },
-        });
-
-        return {
-          order: refreshedOrder,
-          payment: refreshedOrder.paymentTransactions[0] ?? null,
-          receiptUrl: `${env.APP_URL}/api/receipts/public/${paidOrder.receiptToken}`,
-        };
-      }
+  async getOrderPaymentStatus(orderId: string, user: RequestUser) {
+    const order = await getOrderWithLatestPayment(orderId);
+    if (!order) {
+      throw new AppError("Order not found", 404);
     }
+
+    ensureOrderInScope(order, user);
 
     return {
       order,
-      payment: latestTransaction,
-      receiptUrl: order.receiptToken ? `${env.APP_URL}/api/receipts/public/${order.receiptToken}` : null,
+      payment: order.paymentTransactions[0] ?? null,
+      receiptUrl: order.receiptToken ? getReceiptPublicUrl(order.receiptToken) : null,
     };
+  },
+
+  async handleQrisWebhook() {
+    throw new AppError("QRIS webhook is disabled because QRIS is confirmed manually by the cashier.", 400);
   },
 };

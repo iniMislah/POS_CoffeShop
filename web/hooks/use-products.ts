@@ -33,6 +33,27 @@ export function useProducts(token: string | null) {
     void fetchProducts();
   }, [fetchProducts]);
 
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const refreshProducts = () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+      void fetchProducts();
+    };
+
+    window.addEventListener("focus", refreshProducts);
+    document.addEventListener("visibilitychange", refreshProducts);
+
+    return () => {
+      window.removeEventListener("focus", refreshProducts);
+      document.removeEventListener("visibilitychange", refreshProducts);
+    };
+  }, [fetchProducts, token]);
+
   return {
     products,
     isLoading,

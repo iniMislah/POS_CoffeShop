@@ -7,7 +7,9 @@ import { addOrderItemSchema, checkoutOrderSchema, createDraftOrderSchema, orderI
 
 export const orderRoutes = Router();
 
+orderRoutes.get("/recent", asyncHandler(ordersController.listRecent));
 orderRoutes.get("/", asyncHandler(ordersController.list));
+orderRoutes.get("/:id/receipt-qr", validateRequest(orderIdParamSchema, "params"), asyncHandler(ordersController.getReceiptQr));
 orderRoutes.get("/:id", validateRequest(orderIdParamSchema, "params"), asyncHandler(ordersController.getById));
 orderRoutes.post("/", validateRequest(createDraftOrderSchema), asyncHandler(ordersController.createDraft));
 orderRoutes.post("/:id/items", validateRequest(orderIdParamSchema, "params"), validateRequest(addOrderItemSchema), asyncHandler(ordersController.addItem));

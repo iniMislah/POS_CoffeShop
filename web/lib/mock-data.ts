@@ -47,15 +47,21 @@ export type PaymentRecord = {
   createdAt: string;
 };
 
-export const sidebarNavigation = [
-  { title: "Dashboard", href: "/" },
-  { title: "POS / Cashier", href: "/pos" },
-  { title: "Menu Management", href: "/menu-management" },
-  { title: "Inventory", href: "/inventory" },
-  { title: "Transactions", href: "/transactions" },
-  { title: "Payments", href: "/payments" },
-  { title: "Reports", href: "/reports" },
-  { title: "Settings", href: "/settings" },
+export const sidebarNavigation: Array<{
+  title: string;
+  href: string;
+  roles: AuthUser["role"][];
+}> = [
+  { title: "Dashboard", href: "/", roles: ["ADMIN"] },
+  { title: "POS / Cashier", href: "/pos", roles: ["ADMIN", "CASHIER"] },
+  { title: "Menu Management", href: "/menu-management", roles: ["ADMIN"] },
+  { title: "Categories", href: "/categories", roles: ["ADMIN"] },
+  { title: "Customers", href: "/customers", roles: ["ADMIN"] },
+  { title: "Inventory", href: "/inventory", roles: ["ADMIN"] },
+  { title: "Transactions", href: "/transactions", roles: ["ADMIN", "CASHIER"] },
+  { title: "Payments", href: "/payments", roles: ["ADMIN"] },
+  { title: "Reports", href: "/reports", roles: ["ADMIN"] },
+  { title: "Settings", href: "/settings", roles: ["ADMIN"] },
 ];
 
 export const dashboardMetrics: SummaryMetric[] = [
@@ -216,3 +222,4 @@ export const receiptDetail = {
   paymentMethod: "QRIS",
   status: "Paid",
 };
+import type { AuthUser } from "@/lib/types";

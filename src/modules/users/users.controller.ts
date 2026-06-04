@@ -20,8 +20,18 @@ export const usersController = {
   },
 
   async update(req: Request, res: Response) {
-    const result = await usersService.update(req.params.id, req.body);
+    const result = await usersService.update(req.params.id, req.body, req.user!.id);
     return sendSuccess(res, result, "User updated");
+  },
+
+  async updatePassword(req: Request, res: Response) {
+    const result = await usersService.updatePassword(req.params.id, req.body.password);
+    return sendSuccess(res, result, "Password updated");
+  },
+
+  async updateStatus(req: Request, res: Response) {
+    const result = await usersService.updateStatus(req.params.id, req.body.isActive, req.user!.id);
+    return sendSuccess(res, result, "User status updated");
   },
 
   async updateMe(req: Request, res: Response) {

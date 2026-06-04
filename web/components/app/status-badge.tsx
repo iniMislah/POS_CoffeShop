@@ -10,9 +10,16 @@ const styles: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
   pending_payment: "bg-amber-100 text-amber-700",
   low: "bg-rose-100 text-rose-700",
+  "low stock": "bg-rose-100 text-rose-700",
+  "out of stock": "bg-slate-200 text-slate-700",
   healthy: "bg-emerald-100 text-emerald-700",
+  safe: "bg-emerald-100 text-emerald-700",
   available: "bg-emerald-100 text-emerald-700",
   "sold out": "bg-slate-200 text-slate-700",
+  active: "bg-emerald-100 text-emerald-700",
+  inactive: "bg-slate-200 text-slate-700",
+  aktif: "bg-emerald-100 text-emerald-700",
+  nonaktif: "bg-slate-200 text-slate-700",
 };
 
 export function StatusBadge({ value }: { value: string }) {

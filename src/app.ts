@@ -8,11 +8,27 @@ import { openApiDocument } from "./docs/openapi";
 import { errorMiddleware } from "./middlewares/error.middleware";
 import { notFoundMiddleware } from "./middlewares/not-found.middleware";
 import { apiRouter } from "./routes";
+import { env } from "./config/env";
 
 export const app = express();
 
+const allowedOrigins = new Set([
+  env.WEB_APP_URL,
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:5174",
+].filter(Boolean));
+
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Origin is not allowed by CORS"));
+  },
+}));
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -23,9 +39,10 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
+if (process.env.NODE_ENV !== "production" || process.env.ENABLE_SWAGGER === "true") {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
+}
 app.use("/api", apiRouter);
-app.use("/", apiRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

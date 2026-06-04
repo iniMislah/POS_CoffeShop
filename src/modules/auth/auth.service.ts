@@ -14,6 +14,10 @@ export const authService = {
       throw new AppError("Invalid email or password", 401);
     }
 
+    if (!user.isActive) {
+      throw new AppError("User account is inactive. Please contact admin.", 403);
+    }
+
     const passwordMatched = await bcrypt.compare(password, user.passwordHash);
 
     if (!passwordMatched) {

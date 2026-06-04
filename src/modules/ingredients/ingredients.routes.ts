@@ -9,6 +9,8 @@ import { ingredientIdParamSchema, ingredientSchema, updateIngredientSchema } fro
 
 export const ingredientRoutes = Router();
 
+ingredientRoutes.use(authorize(UserRole.ADMIN));
+
 ingredientRoutes.get("/", asyncHandler(ingredientsController.list));
 ingredientRoutes.post("/", authorize(UserRole.ADMIN), validateRequest(ingredientSchema), asyncHandler(ingredientsController.create));
 ingredientRoutes.put("/:id", authorize(UserRole.ADMIN), validateRequest(ingredientIdParamSchema, "params"), validateRequest(updateIngredientSchema), asyncHandler(ingredientsController.update));

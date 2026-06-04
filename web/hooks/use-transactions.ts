@@ -47,14 +47,15 @@ export function useTransactions(token: string | null, filters: Filters) {
       const matchesMethod =
         filters.paymentMethod === "all" ||
         latestPayment?.method.toLowerCase() === filters.paymentMethod.toLowerCase();
-      const matchesDate =
-        !filters.date || transaction.createdAt.slice(0, 10) === filters.date;
+      const transactionDate = new Date(transaction.createdAt).toLocaleDateString("sv");
+      const matchesDate = !filters.date || transactionDate === filters.date;
 
       return matchesStatus && matchesMethod && matchesDate;
     });
   }, [filters.date, filters.paymentMethod, filters.status, transactions]);
 
   return {
+    allTransactions: transactions,
     transactions: filteredTransactions,
     isLoading,
     error,

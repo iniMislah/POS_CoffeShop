@@ -16,6 +16,10 @@ export const inventoryController = {
     return sendSuccess(res, await inventoryService.getLowStock());
   },
 
+  async getStockAlerts(_req: Request, res: Response) {
+    return sendSuccess(res, await inventoryService.getStockAlerts());
+  },
+
   async listMovements(_req: Request, res: Response) {
     return sendSuccess(res, await inventoryService.listMovements());
   },

@@ -9,7 +9,14 @@ export type PaymentListItem = {
   method: "CASH" | "QRIS";
   status: "PENDING" | "PAID" | "FAILED" | "EXPIRED";
   amount: number | string;
+  grossAmount?: number | string | null;
+  gatewayProvider?: string | null;
   gatewayReference?: string | null;
+  transactionId?: string | null;
+  midtransOrderId?: string | null;
+  snapToken?: string | null;
+  redirectUrl?: string | null;
+  paidAt?: string | null;
   createdAt: string;
   order: {
     id: string;

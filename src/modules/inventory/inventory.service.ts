@@ -11,6 +11,19 @@ const getPaidOrderWithRecipe = async (db: Prisma.TransactionClient | typeof pris
         include: {
           product: {
             include: {
+              recipes: {
+                include: {
+                  recipeItems: {
+                    include: {
+                      ingredient: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          variant: {
+            include: {
               recipe: {
                 include: {
                   recipeItems: {
@@ -38,11 +51,19 @@ const getPaidOrderWithRecipe = async (db: Prisma.TransactionClient | typeof pris
   return order;
 };
 
+type RequiredIngredient = {
+  ingredientId: string;
+  ingredientName: string;
+  unit: string;
+  currentStock: number;
+  requiredQty: number;
+};
+
 export const inventoryService = {
   async stockIn(payload: { ingredientId: string; qty: number; note?: string }) {
     return prisma.$transaction(async (tx) => {
-      const ingredient = await tx.ingredient.findUnique({
-        where: { id: payload.ingredientId },
+      const ingredient = await tx.ingredient.findFirst({
+        where: { id: payload.ingredientId, isActive: true },
       });
 
       if (!ingredient) {
@@ -71,8 +92,8 @@ export const inventoryService = {
 
   async adjustStock(payload: { ingredientId: string; newStock: number; note?: string }) {
     return prisma.$transaction(async (tx) => {
-      const ingredient = await tx.ingredient.findUnique({
-        where: { id: payload.ingredientId },
+      const ingredient = await tx.ingredient.findFirst({
+        where: { id: payload.ingredientId, isActive: true },
       });
 
       if (!ingredient) {
@@ -101,10 +122,32 @@ export const inventoryService = {
 
   async getLowStock() {
     const ingredients = await prisma.ingredient.findMany({
+      where: { isActive: true },
       orderBy: { currentStock: "asc" },
     });
 
     return ingredients.filter((ingredient) => Number(ingredient.currentStock) <= Number(ingredient.minimumStock));
+  },
+
+  async getStockAlerts() {
+    const ingredients = await prisma.ingredient.findMany({
+      where: { isActive: true },
+      orderBy: { currentStock: "asc" },
+      select: {
+        id: true,
+        name: true,
+        currentStock: true,
+        minimumStock: true,
+        unit: true,
+      },
+    });
+
+    return ingredients
+      .filter((ingredient) => Number(ingredient.currentStock) <= Number(ingredient.minimumStock))
+      .map((ingredient) => ({
+        ...ingredient,
+        status: Number(ingredient.currentStock) <= 0 ? "OUT_OF_STOCK" : "LOW",
+      }));
   },
 
   async listMovements() {
@@ -123,50 +166,76 @@ export const inventoryService = {
   },
 
   async deductIngredientsForPaidOrderTx(tx: Prisma.TransactionClient, orderId: string) {
-    const existingDeduction = await tx.stockMovement.findFirst({
-      where: {
-        type: StockMovementType.SALE_DEDUCTION,
-        referenceId: orderId,
-      },
+    const deductionState = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { stockDeductedAt: true },
     });
 
-    if (existingDeduction) {
+    if (deductionState?.stockDeductedAt) {
       return { alreadyDeducted: true };
     }
 
     const order = await getPaidOrderWithRecipe(tx, orderId);
+    const requiredByIngredient = new Map<string, RequiredIngredient>();
 
     for (const orderItem of order.orderItems) {
-      const recipeItems = orderItem.product.recipe?.recipeItems ?? [];
+      const productRecipe = orderItem.product.recipes.find((recipe) => recipe.variantId === null);
+      const recipeItems = orderItem.variant?.recipe?.recipeItems ?? productRecipe?.recipeItems ?? [];
+
+      if (recipeItems.length === 0) {
+        throw new AppError("Recipe bahan baku untuk produk ini belum dikonfigurasi.", 400);
+      }
 
       for (const recipeItem of recipeItems) {
         const requiredQty = Number(recipeItem.qtyUsed) * orderItem.qty;
-        const currentStock = Number(recipeItem.ingredient.currentStock);
+        const existing = requiredByIngredient.get(recipeItem.ingredientId);
 
-        if (currentStock < requiredQty) {
-          throw new AppError(`Insufficient stock for ingredient ${recipeItem.ingredient.name}`, 400);
-        }
-
-        await tx.ingredient.update({
-          where: { id: recipeItem.ingredientId },
-          data: {
-            currentStock: {
-              decrement: requiredQty,
-            },
-          },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            ingredientId: recipeItem.ingredientId,
-            type: StockMovementType.SALE_DEDUCTION,
-            qty: -requiredQty,
-            note: `Deduction for order ${order.invoiceNumber}`,
-            referenceId: orderId,
-          },
+        requiredByIngredient.set(recipeItem.ingredientId, {
+          ingredientId: recipeItem.ingredientId,
+          ingredientName: recipeItem.ingredient.name,
+          unit: recipeItem.ingredient.unit,
+          currentStock: Number(recipeItem.ingredient.currentStock),
+          requiredQty: (existing?.requiredQty ?? 0) + requiredQty,
         });
       }
     }
+
+    for (const item of requiredByIngredient.values()) {
+      if (item.currentStock < item.requiredQty) {
+        throw new AppError(
+          `Stok ${item.ingredientName} tidak cukup. Tersedia ${item.currentStock.toLocaleString("id-ID")} ${item.unit}, dibutuhkan ${item.requiredQty.toLocaleString("id-ID")} ${item.unit}.`,
+          400,
+        );
+      }
+    }
+
+    for (const item of requiredByIngredient.values()) {
+      await tx.ingredient.update({
+        where: { id: item.ingredientId },
+        data: {
+          currentStock: {
+            decrement: item.requiredQty,
+          },
+        },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          ingredientId: item.ingredientId,
+          type: StockMovementType.STOCK_OUT,
+          qty: item.requiredQty,
+          note: `ORDER_SALE - ${order.invoiceNumber}`,
+          referenceId: orderId,
+        },
+      });
+    }
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: {
+        stockDeductedAt: new Date(),
+      }
+    });
 
     return { alreadyDeducted: false };
   },

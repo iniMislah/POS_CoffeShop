@@ -1,13 +1,12 @@
 "use client";
 
-import { LogOut } from "lucide-react";
-import { Bell, Search, UserCircle2 } from "lucide-react";
+import { LogOut, UserCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { getRoleLabel } from "@/lib/access-control";
 
 export function Topbar({ title, subtitle }: { title: string; subtitle: string }) {
   const { user, logout } = useAuth();
@@ -25,25 +24,18 @@ export function Topbar({ title, subtitle }: { title: string; subtitle: string })
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-[28px] border border-white/70 bg-white/80 p-5 shadow-soft backdrop-blur md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-3 rounded-[20px] border border-[#E8D8C3]/75 bg-white p-4 shadow-[0_14px_34px_rgba(90,64,50,0.06)] sm:rounded-[24px] sm:p-5 md:flex-row md:items-center md:justify-between">
       <div>
-        <p className="text-sm uppercase tracking-[0.22em] text-coffee-700/45">Coffee Shop Control</p>
-        <h2 className="mt-1 text-3xl font-semibold tracking-tight text-coffee-900">{title}</h2>
-        <p className="mt-1 text-sm text-coffee-700/70">{subtitle}</p>
+        <p className="text-[10px] uppercase tracking-[0.18em] text-[#5A4032]/42 sm:text-xs sm:tracking-[0.22em]">Coffee Shop Control</p>
+        <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-[#5A4032] sm:mt-2 sm:text-3xl">{title}</h2>
+        <p className="mt-1.5 max-w-2xl text-xs leading-snug text-[#5A4032]/68 sm:mt-2 sm:text-sm sm:leading-normal">{subtitle}</p>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-[260px]">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-coffee-700/45" />
-          <Input className="pl-10" placeholder="Search invoice, menu, ingredient..." />
-        </div>
-        <button className="rounded-2xl border border-coffee-300/25 bg-white p-3 text-coffee-700 transition hover:bg-cream-50">
-          <Bell className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-3 rounded-2xl bg-cream-50 px-4 py-2">
-          <UserCircle2 className="h-9 w-9 text-coffee-700" />
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-[#E8D8C3] bg-[#FDFBF7] px-3 py-2 sm:gap-3 sm:px-4">
+          <UserCircle2 className="h-7 w-7 shrink-0 text-[#5A4032] sm:h-9 sm:w-9" />
           <div>
-            <p className="text-sm font-semibold text-coffee-900">{user?.name ?? "Coffee Crew"}</p>
-            <p className="text-xs text-coffee-700/60">{user?.role ?? "Guest"}</p>
+            <p className="max-w-[160px] truncate text-sm font-semibold leading-tight text-[#5A4032]">{user?.name ?? "Coffee Crew"}</p>
+            <p className="text-xs text-[#5A4032]/60">{getRoleLabel(user?.role)}</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={handleLogout}>

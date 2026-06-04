@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 export const Tabs = TabsPrimitive.Root;
 
 export function TabsList({ className, ...props }: TabsPrimitive.TabsListProps) {
-  return <TabsPrimitive.List className={cn("inline-flex rounded-2xl bg-cream-100 p-1", className)} {...props} />;
+  return <TabsPrimitive.List className={cn("inline-flex rounded-2xl border border-[#E8D8C3] bg-[#FDFBF7] p-1", className)} {...props} />;
 }
 
 export function TabsTrigger({ className, ...props }: TabsPrimitive.TabsTriggerProps) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "rounded-xl px-4 py-2 text-sm font-semibold text-coffee-700 transition data-[state=active]:bg-white data-[state=active]:text-coffee-900 data-[state=active]:shadow-sm",
+        "rounded-xl px-4 py-2 text-sm font-semibold text-[#5A4032]/70 transition data-[state=active]:bg-white data-[state=active]:text-[#5A4032] data-[state=active]:shadow-[0_10px_20px_rgba(90,64,50,0.08)]",
         className,
       )}
       {...props}

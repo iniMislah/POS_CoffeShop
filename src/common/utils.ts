@@ -1,5 +1,7 @@
 import crypto from "crypto";
 
+import { env } from "../config/env";
+
 export const generateInvoiceNumber = () => {
   const now = new Date();
   const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -11,4 +13,14 @@ export const generateInvoiceNumber = () => {
 
 export const generateReceiptToken = () => crypto.randomBytes(18).toString("hex");
 
-export const toDecimal = (value: number | string) => Number(value);
+type DecimalLike = number | string | { toString(): string };
+
+export const toDecimal = (value: DecimalLike) => Number(value.toString());
+
+export const getOrderDisplayTotal = (subtotal: DecimalLike, serviceAmount: DecimalLike) =>
+  Number(subtotal.toString()) + Number(serviceAmount.toString());
+
+export const getReceiptPublicUrl = (receiptToken: string) => {
+  const baseUrl = (env.RECEIPT_PUBLIC_BASE_URL ?? env.WEB_APP_URL ?? `${env.APP_URL}/receipt`).replace(/\/$/, "");
+  return baseUrl.endsWith("/receipt") ? `${baseUrl}/${receiptToken}` : `${baseUrl}/receipt/${receiptToken}`;
+};

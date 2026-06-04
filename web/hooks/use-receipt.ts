@@ -19,7 +19,7 @@ export function useReceipt(token: string) {
     setError(null);
 
     try {
-      const result = await apiClient.get<ReceiptResponse>(`/receipts/public/${token}`);
+      const result = await apiClient.get<ReceiptResponse>(`/receipts/${token}`);
       setReceipt(result);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load receipt");

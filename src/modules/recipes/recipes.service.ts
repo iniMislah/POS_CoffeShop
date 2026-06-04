@@ -2,11 +2,15 @@ import { AppError } from "../../common/app-error";
 import { prisma } from "../../lib/prisma";
 
 export const recipesService = {
-  async getByProduct(productId: string) {
-    const recipe = await prisma.recipe.findUnique({
-      where: { productId },
+  async getByProduct(productId: string, variantId?: string | null) {
+    const recipe = await prisma.recipe.findFirst({
+      where: {
+        productId,
+        variantId: variantId ?? null,
+      },
       include: {
         product: true,
+        variant: true,
         recipeItems: {
           include: {
             ingredient: true,
@@ -22,18 +26,39 @@ export const recipesService = {
     return recipe;
   },
 
-  async upsert(productId: string, payload: { items: Array<{ ingredientId: string; qtyUsed: number }> }) {
+  async upsert(productId: string, payload: { variantId?: string | null; items: Array<{ ingredientId: string; qtyUsed: number }> }) {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) {
       throw new AppError("Product not found", 404);
     }
 
+    const variantId = payload.variantId ?? null;
+    if (variantId) {
+      const variant = await prisma.productVariant.findUnique({ where: { id: variantId } });
+      if (!variant || variant.productId !== productId) {
+        throw new AppError("Variant not found for this product", 400);
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
-      const recipe = await tx.recipe.upsert({
-        where: { productId },
-        update: {},
-        create: { productId },
+      const existingRecipe = await tx.recipe.findFirst({
+        where: {
+          productId,
+          variantId,
+        },
       });
+
+      const recipe = existingRecipe
+        ? await tx.recipe.update({
+            where: { id: existingRecipe.id },
+            data: {},
+          })
+        : await tx.recipe.create({
+            data: {
+              productId,
+              variantId,
+            },
+          });
 
       await tx.recipeItem.deleteMany({
         where: { recipeId: recipe.id },
@@ -51,6 +76,7 @@ export const recipesService = {
         where: { id: recipe.id },
         include: {
           product: true,
+          variant: true,
           recipeItems: {
             include: {
               ingredient: true,
@@ -61,8 +87,8 @@ export const recipesService = {
     });
   },
 
-  async calculateHpp(productId: string) {
-    const recipe = await this.getByProduct(productId);
+  async calculateHpp(productId: string, variantId?: string | null) {
+    const recipe = await this.getByProduct(productId, variantId);
 
     const items = recipe.recipeItems.map((item) => {
       const itemCost = Number(item.qtyUsed) * Number(item.ingredient.costPerUnit);
@@ -81,6 +107,8 @@ export const recipesService = {
     return {
       productId,
       productName: recipe.product.name,
+      variantId: recipe.variantId,
+      variantName: recipe.variant?.name ?? null,
       items,
       totalHpp,
     };

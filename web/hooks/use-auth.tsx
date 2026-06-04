@@ -29,15 +29,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = readStoredAuth();
-      if (stored) {
-        setUser(stored.user);
+    let active = true;
+
+    const bootstrap = async () => {
+      try {
+        const stored = readStoredAuth();
+        if (!stored) {
+          return;
+        }
+
+        const profile = await apiClient.get<AuthUser>("/users/me", stored.token);
+        if (!active) {
+          return;
+        }
+
+        setUser(profile);
         setToken(stored.token);
+        writeStoredAuth({
+          token: stored.token,
+          user: profile,
+        });
+      } catch {
+        clearStoredAuth();
+        if (!active) {
+          return;
+        }
+        setUser(null);
+        setToken(null);
+      } finally {
+        if (active) {
+          setIsInitializing(false);
+        }
       }
-    } finally {
-      setIsInitializing(false);
-    }
+    };
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearStoredAuth();
+      setUser(null);
+      setToken(null);
+      setAuthError("Session expired. Please login again.");
+    };
+
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

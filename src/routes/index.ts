@@ -13,11 +13,14 @@ import { orderRoutes } from "../modules/orders/orders.routes";
 import { paymentRoutes } from "../modules/payments/payments.routes";
 import { receiptRoutes } from "../modules/receipts/receipts.routes";
 import { reportRoutes } from "../modules/reports/reports.routes";
+import { customerRoutes } from "../modules/customers/customers.routes";
+import { dashboardRoutes } from "../modules/dashboard/dashboard.routes";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/payments/webhooks", paymentRoutes.publicRouter);
+apiRouter.use("/receipts", receiptRoutes.publicRouter);
 apiRouter.use("/receipts/public", receiptRoutes.publicRouter);
 
 apiRouter.use(authenticate);
@@ -32,4 +35,6 @@ apiRouter.use("/inventory", inventoryRoutes);
 apiRouter.use("/orders", orderRoutes);
 apiRouter.use("/payments", paymentRoutes.privateRouter);
 apiRouter.use("/receipts", receiptRoutes.privateRouter);
+apiRouter.use("/dashboard", dashboardRoutes);
 apiRouter.use("/reports", reportRoutes);
+apiRouter.use("/customers", customerRoutes);
