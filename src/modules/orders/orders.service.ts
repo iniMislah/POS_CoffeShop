@@ -3,11 +3,7 @@ import { OrderStatus, PaymentStatus, UserRole } from "@prisma/client";
 import { AppError } from "../../common/app-error";
 import { generateInvoiceNumber } from "../../common/utils";
 import { prisma } from "../../lib/prisma";
-
-type RecalculateInput = {
-  taxAmount?: number;
-  serviceAmount?: number;
-};
+import { DEFAULT_ORDER_SERVICE_AMOUNT, DEFAULT_ORDER_TAX_AMOUNT } from "./orders.validation";
 
 type RequestUser = {
   id: string;
@@ -37,6 +33,12 @@ const ensureOrderInScope = (order: { cashierId: string }, user: RequestUser) => 
   }
 };
 
+const ensureTaxServiceDisabled = (payload: { taxAmount: number; serviceAmount: number }) => {
+  if (payload.taxAmount !== DEFAULT_ORDER_TAX_AMOUNT || payload.serviceAmount !== DEFAULT_ORDER_SERVICE_AMOUNT) {
+    throw new AppError("Tax and service charge are not enabled for this POS.", 400);
+  }
+};
+
 const orderScopeWhere = (user: RequestUser) =>
   user.role === UserRole.ADMIN
     ? {}
@@ -44,7 +46,7 @@ const orderScopeWhere = (user: RequestUser) =>
         cashierId: user.id,
       };
 
-const recalculateTotals = async (orderId: string, input?: RecalculateInput) => {
+const recalculateTotals = async (orderId: string) => {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -57,8 +59,8 @@ const recalculateTotals = async (orderId: string, input?: RecalculateInput) => {
   }
 
   const subtotal = order.orderItems.reduce((sum, item) => sum + Number(item.lineTotal), 0);
-  const taxAmount = input?.taxAmount ?? Number(order.taxAmount);
-  const serviceAmount = input?.serviceAmount ?? Number(order.serviceAmount);
+  const taxAmount = DEFAULT_ORDER_TAX_AMOUNT;
+  const serviceAmount = DEFAULT_ORDER_SERVICE_AMOUNT;
   const totalAmount = subtotal + taxAmount + serviceAmount;
 
   return prisma.order.update({
@@ -353,7 +355,9 @@ export const ordersService = {
       throw new AppError("Order has no items", 400);
     }
 
-    await recalculateTotals(orderId, payload);
+    ensureTaxServiceDisabled(payload);
+
+    await recalculateTotals(orderId);
 
     return prisma.order.update({
       where: { id: orderId },
@@ -394,7 +398,7 @@ export const ordersService = {
     });
   },
 
-  async recalculate(orderId: string, input?: RecalculateInput) {
-    return recalculateTotals(orderId, input);
+  async recalculate(orderId: string) {
+    return recalculateTotals(orderId);
   },
 };

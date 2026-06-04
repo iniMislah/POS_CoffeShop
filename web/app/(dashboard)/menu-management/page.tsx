@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { BookOpen, Download, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
+import { Bell, BookOpen, Download, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
 import { ModernSelect } from "@/components/ui/modern-select";
 import { DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -35,6 +35,11 @@ type RecipeFormItem = {
   qtyUsed: string;
 };
 
+type FormAlert = {
+  title: string;
+  message: string;
+};
+
 const parseTextareaOptions = (raw: string, label: string) => {
   return raw
     .split("\n")
@@ -47,11 +52,11 @@ const parseTextareaOptions = (raw: string, label: string) => {
       const value = Number(separatorIndex === -1 ? match?.[2] : line.slice(separatorIndex + 1).trim());
 
       if (!name) {
-        throw new Error(`${label} format is invalid on line ${index + 1}. Use Name Price or Name:Price.`);
+        throw new Error(`${label} baris ${index + 1} belum sesuai. Gunakan format Nama Harga atau Nama:Harga, contoh: Large 23000.`);
       }
 
       if (!Number.isFinite(value) || value < 0) {
-        throw new Error(`${label} price is invalid on line ${index + 1}.`);
+        throw new Error(`${label} baris ${index + 1} harus memakai harga angka 0 atau lebih, contoh: Large 23000.`);
       }
 
       return { name, value };
@@ -68,6 +73,24 @@ const emptyForm: FormState = {
   modifiers: "",
 };
 
+const getProductValidationAlert = (form: FormState): FormAlert | null => {
+  const basePrice = Number(form.basePrice);
+
+  if (!form.name.trim()) {
+    return { title: "Nama produk belum diisi", message: "Isi nama produk dengan jelas, contoh: Kopi Susu Gula Aren." };
+  }
+
+  if (!form.categoryId) {
+    return { title: "Kategori belum dipilih", message: "Pilih kategori produk sebelum menyimpan menu." };
+  }
+
+  if (form.basePrice === "" || !Number.isFinite(basePrice) || basePrice < 0) {
+    return { title: "Harga dasar tidak valid", message: "Gunakan angka 0 atau lebih, contoh: 18000." };
+  }
+
+  return null;
+};
+
 export default function MenuManagementPage() {
   const { token } = useAuth();
   const { pushToast } = useToast();
@@ -77,6 +100,7 @@ export default function MenuManagementPage() {
   const [open, setOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [formAlert, setFormAlert] = useState<FormAlert | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
@@ -99,6 +123,7 @@ export default function MenuManagementPage() {
 
   const openCreate = () => {
     setEditingProduct(null);
+    setFormAlert(null);
     setForm({
       ...emptyForm,
       categoryId: categories[0]?.id ?? "",
@@ -118,6 +143,7 @@ export default function MenuManagementPage() {
       variants: product.variants.map((variant) => `${variant.name}:${basePrice + Number(variant.priceDelta)}`).join("\n"),
       modifiers: product.modifiers.map((modifier) => `${modifier.name}:${Number(modifier.price)}`).join("\n"),
     });
+    setFormAlert(null);
     setOpen(true);
   };
 
@@ -127,8 +153,15 @@ export default function MenuManagementPage() {
     }
 
     setIsSaving(true);
+    setFormAlert(null);
 
     try {
+      const validationAlert = getProductValidationAlert(form);
+      if (validationAlert) {
+        setFormAlert(validationAlert);
+        return;
+      }
+
       const basePrice = Number(form.basePrice);
       const variants = parseTextareaOptions(form.variants, "Variant").map((item) => ({
         name: item.name,
@@ -166,10 +199,15 @@ export default function MenuManagementPage() {
       setEditingProduct(null);
       setForm(emptyForm);
     } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : "Unable to save product.";
+      setFormAlert({
+        title: "Produk belum bisa disimpan",
+        message,
+      });
       pushToast({
         type: "error",
         title: "Save failed",
-        description: saveError instanceof Error ? saveError.message : "Unable to save product.",
+        description: message,
       });
     } finally {
       setIsSaving(false);
@@ -397,6 +435,15 @@ export default function MenuManagementPage() {
             <DialogDescription className="text-coffee-700/70">
               Atur nama produk, kategori, harga, foto, varian, dan modifier dalam tampilan yang lebih rapi dan konsisten.
             </DialogDescription>
+            {formAlert ? (
+              <div className="mt-5 flex gap-3 rounded-[20px] border border-[#D9C6AF] bg-[#FCF4E8] px-4 py-3 text-sm text-[#5A4032]">
+                <Bell className="mt-0.5 h-4 w-4 shrink-0 text-[#7A543D]" />
+                <div>
+                  <p className="font-semibold">{formAlert.title}</p>
+                  <p className="mt-1 leading-relaxed text-[#5A4032]/75">{formAlert.message}</p>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-6 grid gap-5 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-semibold text-coffee-900">Product Name</label>

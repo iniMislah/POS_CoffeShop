@@ -16,8 +16,8 @@ export const addOrderItemSchema = z.object({
 });
 
 export const checkoutOrderSchema = z.object({
-  taxAmount: z.coerce.number().nonnegative().default(DEFAULT_ORDER_TAX_AMOUNT),
-  serviceAmount: z.coerce.number().nonnegative().default(DEFAULT_ORDER_SERVICE_AMOUNT),
+  taxAmount: z.coerce.number().optional().default(DEFAULT_ORDER_TAX_AMOUNT),
+  serviceAmount: z.coerce.number().optional().default(DEFAULT_ORDER_SERVICE_AMOUNT),
 });
 
 export const orderIdParamSchema = z.object({

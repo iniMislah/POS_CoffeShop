@@ -51,8 +51,7 @@ npm run dev
 
 ## Kredensial Seed
 
-- Admin: `admin@kopikita.local` / `Admin123!`
-- Cashier: `cashier@kopikita.local` / `Cashier123!`
+- Admin: `fatma@galehkopi.local` / `admin123#`
 
 ## Dokumentasi
 

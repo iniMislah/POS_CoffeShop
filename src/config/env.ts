@@ -16,6 +16,18 @@ const envSchema = z.object({
   MIDTRANS_SERVER_KEY: z.string().optional(),
   MIDTRANS_CLIENT_KEY: z.string().optional(),
   MIDTRANS_IS_PRODUCTION: z.coerce.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (!value.RECEIPT_PUBLIC_BASE_URL && !value.WEB_APP_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["RECEIPT_PUBLIC_BASE_URL"],
+      message: "RECEIPT_PUBLIC_BASE_URL or WEB_APP_URL is required in production for public digital receipts.",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

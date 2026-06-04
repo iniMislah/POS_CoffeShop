@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PackagePlus, PencilLine, Plus, Trash2 } from "lucide-react";
+import { Bell, PackagePlus, PencilLine, Plus, Trash2 } from "lucide-react";
 
 import { DataTable } from "@/components/app/data-table";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -24,6 +24,11 @@ type InventoryFormState = {
   note: string;
 };
 
+type FormAlert = {
+  title: string;
+  message: string;
+};
+
 const emptyForm: InventoryFormState = {
   name: "",
   unit: "",
@@ -33,25 +38,29 @@ const emptyForm: InventoryFormState = {
   note: "",
 };
 
-const getInventoryValidationError = (form: InventoryFormState) => {
+const getInventoryValidationAlert = (form: InventoryFormState): FormAlert | null => {
+  const currentStock = Number(form.currentStock);
+  const minimumStock = Number(form.minimumStock);
+  const costPerUnit = Number(form.costPerUnit);
+
   if (!form.name.trim()) {
-    return "Ingredient name is required.";
+    return { title: "Nama ingredient belum diisi", message: "Isi nama bahan dengan jelas, contoh: Arabica Beans." };
   }
 
   if (!form.unit.trim()) {
-    return "Unit is required.";
+    return { title: "Unit belum diisi", message: "Gunakan unit stok yang konsisten, contoh: gram, ml, atau pcs." };
   }
 
-  if (form.currentStock === "" || Number(form.currentStock) < 0) {
-    return "Current stock must be 0 or more.";
+  if (form.currentStock === "" || !Number.isFinite(currentStock) || currentStock < 0) {
+    return { title: "Current stock tidak valid", message: "Gunakan angka 0 atau lebih, contoh: 1000." };
   }
 
-  if (form.minimumStock === "" || Number(form.minimumStock) < 0) {
-    return "Minimum stock must be 0 or more.";
+  if (form.minimumStock === "" || !Number.isFinite(minimumStock) || minimumStock < 0) {
+    return { title: "Minimum stock tidak valid", message: "Gunakan angka 0 atau lebih untuk batas stok minimum." };
   }
 
-  if (form.costPerUnit === "" || Number(form.costPerUnit) < 0) {
-    return "Cost per unit must be 0 or more.";
+  if (form.costPerUnit === "" || !Number.isFinite(costPerUnit) || costPerUnit < 0) {
+    return { title: "Cost per unit tidak valid", message: "Gunakan angka 0 atau lebih, contoh: 120." };
   }
 
   return null;
@@ -74,6 +83,7 @@ export default function InventoryPage() {
   const [editorMode, setEditorMode] = useState<"create" | "edit">("create");
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const [form, setForm] = useState<InventoryFormState>(emptyForm);
+  const [formAlert, setFormAlert] = useState<FormAlert | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
@@ -98,6 +108,7 @@ export default function InventoryPage() {
   const openCreate = () => {
     setEditorMode("create");
     setSelectedIngredient(null);
+    setFormAlert(null);
     setForm(emptyForm);
     setEditorOpen(true);
   };
@@ -105,6 +116,7 @@ export default function InventoryPage() {
   const openEdit = (ingredient: Ingredient) => {
     setEditorMode("edit");
     setSelectedIngredient(ingredient);
+    setFormAlert(null);
     setForm({
       name: ingredient.name,
       unit: ingredient.unit,
@@ -130,17 +142,14 @@ export default function InventoryPage() {
   };
 
   const handleSaveIngredient = async () => {
-    const validationError = getInventoryValidationError(form);
-    if (validationError) {
-      pushToast({
-        type: "error",
-        title: "Validation failed",
-        description: validationError,
-      });
+    const validationAlert = getInventoryValidationAlert(form);
+    if (validationAlert) {
+      setFormAlert(validationAlert);
       return;
     }
 
     setIsSaving(true);
+    setFormAlert(null);
 
     try {
       const payload = {
@@ -174,10 +183,15 @@ export default function InventoryPage() {
       setSelectedIngredient(null);
       setForm(emptyForm);
     } catch (submitError) {
+      const message = submitError instanceof Error ? submitError.message : "Unable to save inventory item.";
+      setFormAlert({
+        title: "Inventory belum bisa disimpan",
+        message,
+      });
       pushToast({
         type: "error",
         title: "Save failed",
-        description: submitError instanceof Error ? submitError.message : "Unable to save inventory item.",
+        description: message,
       });
     } finally {
       setIsSaving(false);
@@ -325,6 +339,15 @@ export default function InventoryPage() {
           <DialogDescription className="text-coffee-700/70">
             Simpan ingredient langsung ke database inventory yang sudah dipakai sistem.
           </DialogDescription>
+          {formAlert ? (
+            <div className="mt-5 flex gap-3 rounded-[20px] border border-[#D9C6AF] bg-[#FCF4E8] px-4 py-3 text-sm text-[#5A4032]">
+              <Bell className="mt-0.5 h-4 w-4 shrink-0 text-[#7A543D]" />
+              <div>
+                <p className="font-semibold">{formAlert.title}</p>
+                <p className="mt-1 leading-relaxed text-[#5A4032]/75">{formAlert.message}</p>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-6 grid gap-5 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-coffee-900">Ingredient Name</label>

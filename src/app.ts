@@ -12,12 +12,18 @@ import { env } from "./config/env";
 
 export const app = express();
 
-const allowedOrigins = new Set([
-  env.WEB_APP_URL,
+const developmentOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://localhost:5174",
-].filter(Boolean));
+];
+
+const allowedOrigins = new Set(
+  [
+    env.WEB_APP_URL,
+    ...(process.env.NODE_ENV === "production" ? [] : developmentOrigins),
+  ].filter(Boolean),
+);
 
 app.use(helmet());
 app.use(cors({

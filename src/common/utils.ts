@@ -21,6 +21,12 @@ export const getOrderDisplayTotal = (subtotal: DecimalLike, serviceAmount: Decim
   Number(subtotal.toString()) + Number(serviceAmount.toString());
 
 export const getReceiptPublicUrl = (receiptToken: string) => {
-  const baseUrl = (env.RECEIPT_PUBLIC_BASE_URL ?? env.WEB_APP_URL ?? `${env.APP_URL}/receipt`).replace(/\/$/, "");
+  const fallbackBaseUrl = process.env.NODE_ENV === "production" ? undefined : `${env.APP_URL}/receipt`;
+  const baseUrl = (env.RECEIPT_PUBLIC_BASE_URL ?? env.WEB_APP_URL ?? fallbackBaseUrl)?.replace(/\/$/, "");
+
+  if (!baseUrl) {
+    throw new Error("Receipt public base URL is not configured.");
+  }
+
   return baseUrl.endsWith("/receipt") ? `${baseUrl}/${receiptToken}` : `${baseUrl}/receipt/${receiptToken}`;
 };

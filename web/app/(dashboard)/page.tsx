@@ -145,7 +145,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="px-0 pb-4">
             {orderedLatestOrders.length === 0 ? (
-              <div className="rounded-2xl border border-[#E8D8C3] bg-[#FDFBF7] p-4 text-sm text-[#5A4032]/68">Belum ada transaksi terbaru.</div>
+              <div className="mx-4 inline-flex rounded-xl border border-[#E8D8C3] bg-[#FDFBF7] px-3 py-2 text-sm text-[#5A4032]/68">
+                Belum ada transaksi terbaru.
+              </div>
             ) : (
               <div className="relative min-h-[430px] overflow-hidden px-4 sm:min-h-[360px]">
                 {orderedLatestOrders.map((order, index) => {
