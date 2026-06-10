@@ -18,7 +18,8 @@ export const productsController = {
   },
 
   async create(req: Request, res: Response) {
-    return sendSuccess(res, await productsService.create(req.body), "Product created", 201);
+    const imageUrl = req.file ? `/uploads/products/${req.file.filename}` : req.body.imageUrl;
+    return sendSuccess(res, await productsService.create({ ...req.body, imageUrl }), "Product created", 201);
   },
 
   async update(req: Request, res: Response) {

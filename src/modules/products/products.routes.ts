@@ -5,6 +5,7 @@ import { asyncHandler } from "../../common/async-handler";
 import { authorize } from "../../middlewares/auth.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { productsController } from "./products.controller";
+import { normalizeProductMultipartBody, productImageUpload } from "./products.upload";
 import {
   productIdParamSchema,
   productSchema,
@@ -19,7 +20,14 @@ export const productRoutes = Router();
 productRoutes.get("/export", authorize(UserRole.ADMIN), asyncHandler(productsController.export));
 productRoutes.get("/", asyncHandler(productsController.list));
 productRoutes.get("/:id", validateRequest(productIdParamSchema, "params"), asyncHandler(productsController.getById));
-productRoutes.post("/", authorize(UserRole.ADMIN), validateRequest(productSchema), asyncHandler(productsController.create));
+productRoutes.post(
+  "/",
+  authorize(UserRole.ADMIN),
+  productImageUpload.single("image"),
+  normalizeProductMultipartBody,
+  validateRequest(productSchema),
+  asyncHandler(productsController.create),
+);
 productRoutes.put("/:id", authorize(UserRole.ADMIN), validateRequest(productIdParamSchema, "params"), validateRequest(updateProductSchema), asyncHandler(productsController.update));
 productRoutes.delete("/:id", authorize(UserRole.ADMIN), validateRequest(productIdParamSchema, "params"), asyncHandler(productsController.remove));
 

@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
 import swaggerUi from "swagger-ui-express";
 
 import { openApiDocument } from "./docs/openapi";
@@ -37,6 +38,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(morgan("dev"));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/health", (_req, res) => {
   res.json({
