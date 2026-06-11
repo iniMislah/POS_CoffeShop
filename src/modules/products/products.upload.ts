@@ -6,6 +6,9 @@ import multer from "multer";
 import { AppError } from "../../common/app-error";
 
 const productUploadDir = path.join(process.cwd(), "uploads", "products");
+const maxProductImageSize = 1024 * 1024;
+const allowedProductImageTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const invalidProductImageFormatMessage = "Format gambar harus JPG, JPEG, PNG, atau WEBP.";
 
 export const ensureProductUploadDir = () => {
   fs.mkdirSync(productUploadDir, { recursive: true });
@@ -25,9 +28,12 @@ const storage = multer.diskStorage({
 
 export const productImageUpload = multer({
   storage,
+  limits: {
+    fileSize: maxProductImageSize,
+  },
   fileFilter(_req, file, callback) {
-    if (!file.mimetype.startsWith("image/")) {
-      return callback(new AppError("Product image must be an image file.", 422));
+    if (!allowedProductImageTypes.has(file.mimetype)) {
+      return callback(new AppError(invalidProductImageFormatMessage, 400));
     }
 
     return callback(null, true);

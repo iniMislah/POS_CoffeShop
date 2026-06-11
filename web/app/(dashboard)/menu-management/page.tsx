@@ -73,6 +73,12 @@ const emptyForm: FormState = {
   modifiers: "",
 };
 
+const maxProductImageSize = 1024 * 1024;
+const allowedProductImageTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const productImageAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/jpg,image/png,image/webp";
+const productImageSizeMessage = "Ukuran gambar terlalu besar. Maksimal 1 MB.";
+const productImageFormatMessage = "Format gambar harus JPG, JPEG, PNG, atau WEBP.";
+
 const getProductValidationAlert = (form: FormState): FormAlert | null => {
   const basePrice = Number(form.basePrice);
 
@@ -100,6 +106,7 @@ export default function MenuManagementPage() {
   const [open, setOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formAlert, setFormAlert] = useState<FormAlert | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -123,6 +130,7 @@ export default function MenuManagementPage() {
 
   const openCreate = () => {
     setEditingProduct(null);
+    setImageFile(null);
     setFormAlert(null);
     setForm({
       ...emptyForm,
@@ -134,6 +142,7 @@ export default function MenuManagementPage() {
   const openEdit = (product: Product) => {
     const basePrice = Number(product.basePrice);
     setEditingProduct(product);
+    setImageFile(null);
     setForm({
       name: product.name,
       categoryId: product.categoryId,
@@ -172,20 +181,46 @@ export default function MenuManagementPage() {
         price: item.value,
       }));
 
-      const payload = {
+      const payload: {
+        name: string;
+        categoryId: string;
+        basePrice: number;
+        imageUrl?: string | null;
+        isAvailable: boolean;
+        variants: Array<{ name: string; priceDelta: number }>;
+        modifiers: Array<{ name: string; price: number }>;
+      } = {
         name: form.name,
         categoryId: form.categoryId,
         basePrice,
-        imageUrl: form.imageUrl || null,
         isAvailable: form.isAvailable === "true",
         variants,
         modifiers,
       };
 
+      if (!editingProduct || form.imageUrl !== (editingProduct.imageUrl ?? "")) {
+        payload.imageUrl = form.imageUrl || null;
+      }
+
+      const requestBody =
+        imageFile
+          ? (() => {
+              const formData = new FormData();
+              formData.append("name", payload.name);
+              formData.append("categoryId", payload.categoryId);
+              formData.append("basePrice", String(payload.basePrice));
+              formData.append("image", imageFile);
+              formData.append("isAvailable", String(payload.isAvailable));
+              formData.append("variants", JSON.stringify(payload.variants));
+              formData.append("modifiers", JSON.stringify(payload.modifiers));
+              return formData;
+            })()
+          : payload;
+
       if (editingProduct) {
-        await apiClient.put(`/products/${editingProduct.id}`, payload, token);
+        await apiClient.put(`/products/${editingProduct.id}`, requestBody, token);
       } else {
-        await apiClient.post<Product>("/products", payload, token);
+        await apiClient.post<Product>("/products", requestBody, token);
       }
       await refetch();
 
@@ -197,6 +232,7 @@ export default function MenuManagementPage() {
 
       setOpen(false);
       setEditingProduct(null);
+      setImageFile(null);
       setForm(emptyForm);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : "Unable to save product.";
@@ -248,7 +284,25 @@ export default function MenuManagementPage() {
 
   const handleImageChange = async (file: File | null) => {
     if (!file) {
+      setImageFile(null);
       setForm((current) => ({ ...current, imageUrl: "" }));
+      return;
+    }
+
+    const imageValidationAlert = !allowedProductImageTypes.has(file.type)
+      ? { title: "Format gambar tidak valid", message: productImageFormatMessage }
+      : file.size > maxProductImageSize
+        ? { title: "Ukuran gambar terlalu besar", message: productImageSizeMessage }
+        : null;
+
+    if (imageValidationAlert) {
+      setImageFile(null);
+      setFormAlert(imageValidationAlert);
+      pushToast({
+        type: "error",
+        title: "Image upload failed",
+        description: imageValidationAlert.message,
+      });
       return;
     }
 
@@ -262,6 +316,8 @@ export default function MenuManagementPage() {
 
     try {
       const imageUrl = await toDataUrl();
+      setImageFile(file);
+      setFormAlert(null);
       setForm((current) => ({ ...current, imageUrl }));
     } catch (fileError) {
       pushToast({
@@ -502,9 +558,12 @@ export default function MenuManagementPage() {
                     <span>Choose image file</span>
                     <Input
                       type="file"
-                      accept="image/*"
+                      accept={productImageAccept}
                       className="hidden"
-                      onChange={(event) => void handleImageChange(event.target.files?.[0] ?? null)}
+                      onChange={(event) => {
+                        void handleImageChange(event.target.files?.[0] ?? null);
+                        event.currentTarget.value = "";
+                      }}
                     />
                   </label>
 

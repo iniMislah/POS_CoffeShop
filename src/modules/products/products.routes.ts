@@ -28,7 +28,15 @@ productRoutes.post(
   validateRequest(productSchema),
   asyncHandler(productsController.create),
 );
-productRoutes.put("/:id", authorize(UserRole.ADMIN), validateRequest(productIdParamSchema, "params"), validateRequest(updateProductSchema), asyncHandler(productsController.update));
+productRoutes.put(
+  "/:id",
+  authorize(UserRole.ADMIN),
+  validateRequest(productIdParamSchema, "params"),
+  productImageUpload.single("image"),
+  normalizeProductMultipartBody,
+  validateRequest(updateProductSchema),
+  asyncHandler(productsController.update),
+);
 productRoutes.delete("/:id", authorize(UserRole.ADMIN), validateRequest(productIdParamSchema, "params"), asyncHandler(productsController.remove));
 
 productRoutes.post("/:productId/variants", authorize(UserRole.ADMIN), validateRequest(productVariantCreateParamSchema, "params"), validateRequest(variantSchema), asyncHandler(productsController.createVariant));

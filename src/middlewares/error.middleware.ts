@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
@@ -18,6 +19,14 @@ export const errorMiddleware = (error: unknown, _req: Request, res: Response, _n
       success: false,
       message: error.message,
       errors: error.details ?? null,
+    });
+  }
+
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({
+      success: false,
+      message: error.code === "LIMIT_FILE_SIZE" ? "Ukuran gambar terlalu besar. Maksimal 1 MB." : "Invalid upload request.",
+      errors: null,
     });
   }
 

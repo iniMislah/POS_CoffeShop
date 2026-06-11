@@ -23,7 +23,8 @@ export const productsController = {
   },
 
   async update(req: Request, res: Response) {
-    return sendSuccess(res, await productsService.update(req.params.id, req.body), "Product updated");
+    const imageUrl = req.file ? `/uploads/products/${req.file.filename}` : req.body.imageUrl;
+    return sendSuccess(res, await productsService.update(req.params.id, { ...req.body, imageUrl }), "Product updated");
   },
 
   async remove(req: Request, res: Response) {
