@@ -17,6 +17,7 @@ import { useInventory } from "@/hooks/use-inventory";
 import { useProducts } from "@/hooks/use-products";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { resolveProductImageUrl } from "@/lib/product-image";
 import type { Product, Recipe } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
@@ -116,6 +117,7 @@ export default function MenuManagementPage() {
   const [recipeItems, setRecipeItems] = useState<RecipeFormItem[]>([]);
   const [isRecipeLoading, setIsRecipeLoading] = useState(false);
   const [isRecipeSaving, setIsRecipeSaving] = useState(false);
+  const productImagePreviewUrl = imageFile ? form.imageUrl : resolveProductImageUrl(form.imageUrl);
 
   const preparedRows = useMemo(
     () =>
@@ -567,10 +569,10 @@ export default function MenuManagementPage() {
                     />
                   </label>
 
-                  {form.imageUrl ? (
+                  {productImagePreviewUrl ? (
                     <div className="mt-3 overflow-hidden rounded-[18px] border border-[#E8D8C3]/70 bg-[#FDFBF7] p-2">
                       <div className="relative h-32 overflow-hidden rounded-xl">
-                        <Image src={form.imageUrl} alt="Product preview" fill className="object-cover" />
+                        <Image src={productImagePreviewUrl} alt="Product preview" fill className="object-cover" />
                       </div>
                     </div>
                   ) : (

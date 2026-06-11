@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { resolveProductImageUrl } from "@/lib/product-image";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -15,11 +16,15 @@ export function ProductCard({
   onAdd?: (product: Product) => void;
   disabled?: boolean;
 }) {
+  const productImageUrl =
+    resolveProductImageUrl(product.imageUrl) ||
+    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80";
+
   return (
     <Card className="group flex h-full flex-col overflow-hidden border-[#E8D8C3]/75 bg-white p-0 transition duration-200 hover:-translate-y-0.5 hover:shadow-panel">
       <div className="relative h-40 overflow-hidden">
         <Image
-          src={product.imageUrl || "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80"}
+          src={productImageUrl}
           alt={product.name}
           fill
           className="object-cover transition duration-300 group-hover:scale-105"
